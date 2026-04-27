@@ -1,10 +1,8 @@
 from concurrent import futures
 import logging
-
 import grpc
 import EmployeeService_pb2
 import EmployeeService_pb2_grpc
-
 import const
 
 empDB=[
@@ -23,28 +21,27 @@ empDB=[
 class EmployeeServer(EmployeeService_pb2_grpc.EmployeeServiceServicer):
 
   def CreateEmployee(self, request, context):
-    dat = {
-    'id':request.id,
-    'name':request.name,
-    'title':request.title
-    }
+    dat = {'id':request.id, 'name':request.name, 'title':request.title}
     empDB.append(dat)
     return EmployeeService_pb2.StatusReply(status='OK')
 
   def GetEmployeeDataFromID(self, request, context):
     usr = [ emp for emp in empDB if (emp['id'] == request.id) ] 
-    return EmployeeService_pb2.EmployeeData(id=usr[0]['id'], name=usr[0]['name'], title=usr[0]['title'])
+    if len(usr) > 0:
+        return EmployeeService_pb2.EmployeeData(id=usr[0]['id'], name=usr[0]['name'], title=usr[0]['title'])
+    return EmployeeService_pb2.EmployeeData()
 
   def UpdateEmployeeTitle(self, request, context):
     usr = [ emp for emp in empDB if (emp['id'] == request.id) ]
-    usr[0]['title'] = request.title
-    return EmployeeService_pb2.StatusReply(status='OK')
+    if len(usr) > 0:
+        usr[0]['title'] = request.title
+        return EmployeeService_pb2.StatusReply(status='OK')
+    return EmployeeService_pb2.StatusReply(status='NOT FOUND')
 
   def DeleteEmployee(self, request, context):
     usr = [ emp for emp in empDB if (emp['id'] == request.id) ]
     if len(usr) == 0:
       return EmployeeService_pb2.StatusReply(status='NOK')
-
     empDB.remove(usr[0])
     return EmployeeService_pb2.StatusReply(status='OK')
 
@@ -55,13 +52,22 @@ class EmployeeServer(EmployeeService_pb2_grpc.EmployeeServiceServicer):
       list.employee_data.append(emp_data)
     return list
 
+  def GetEmployeeName(self, request, context):
+    usr = [emp for emp in empDB if (emp['id'] == request.id)]
+    if len(usr) > 0:
+        return EmployeeService_pb2.EmployeeNameReply(name=usr[0]['name'])
+    return EmployeeService_pb2.EmployeeNameReply(name="Não encontrado")
+
+  def CountEmployees(self, request, context):
+    return EmployeeService_pb2.EmployeeCount(count=len(empDB))
+
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     EmployeeService_pb2_grpc.add_EmployeeServiceServicer_to_server(EmployeeServer(), server)
     server.add_insecure_port('[::]:'+const.PORT)
+    print(f"Servidor gRPC iniciado na porta {const.PORT}...")
     server.start()
     server.wait_for_termination()
-
 
 if __name__ == '__main__':
     logging.basicConfig()
